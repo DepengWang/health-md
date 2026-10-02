@@ -107,6 +107,7 @@ class ProductCapabilityManifestTest {
             "export.mobility-and-performance",
             "export.profiles",
             "export.scheduled-today-refresh",
+            "settings.sleep-attribution",
             "core.shared-rust-metric-registry",
             "automation.cancel-active-export",
             "direct-cli.shared-qr-pairing",
