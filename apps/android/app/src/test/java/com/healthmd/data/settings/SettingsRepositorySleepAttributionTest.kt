@@ -44,9 +44,9 @@ class SettingsRepositorySleepAttributionTest {
     }
 
     @Test
-    fun `missing preference fails closed to night begins`() = runTest {
-        assertThat(repository.getSleepDayAttribution()).isEqualTo(SleepDayAttribution.NIGHT_BEGINS)
-        assertThat(repository.sleepDayAttribution.first()).isEqualTo(SleepDayAttribution.NIGHT_BEGINS)
+    fun `missing preference defaults to morning ends`() = runTest {
+        assertThat(repository.getSleepDayAttribution()).isEqualTo(SleepDayAttribution.MORNING_ENDS)
+        assertThat(repository.sleepDayAttribution.first()).isEqualTo(SleepDayAttribution.MORNING_ENDS)
     }
 
     @Test
@@ -58,18 +58,18 @@ class SettingsRepositorySleepAttributionTest {
     }
 
     @Test
-    fun `reselecting night begins persists the shipped default`() = runTest {
-        repository.setSleepDayAttribution(SleepDayAttribution.MORNING_ENDS)
+    fun `selecting night begins persists over the default`() = runTest {
         repository.setSleepDayAttribution(SleepDayAttribution.NIGHT_BEGINS)
 
         assertThat(repository.getSleepDayAttribution()).isEqualTo(SleepDayAttribution.NIGHT_BEGINS)
+        assertThat(repository.sleepDayAttribution.first()).isEqualTo(SleepDayAttribution.NIGHT_BEGINS)
     }
 
     @Test
-    fun `unknown wire values fail closed to the shipped default`() {
-        assertThat(SleepDayAttribution.fromWireValue(null)).isEqualTo(SleepDayAttribution.NIGHT_BEGINS)
+    fun `unknown wire values resolve to the default`() {
+        assertThat(SleepDayAttribution.fromWireValue(null)).isEqualTo(SleepDayAttribution.MORNING_ENDS)
         assertThat(SleepDayAttribution.fromWireValue("solstice"))
-            .isEqualTo(SleepDayAttribution.NIGHT_BEGINS)
+            .isEqualTo(SleepDayAttribution.MORNING_ENDS)
         assertThat(SleepDayAttribution.fromWireValue("morning_ends"))
             .isEqualTo(SleepDayAttribution.MORNING_ENDS)
         assertThat(SleepDayAttribution.fromWireValue("night_begins"))

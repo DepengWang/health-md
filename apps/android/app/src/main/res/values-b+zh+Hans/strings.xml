@@ -263,7 +263,7 @@
     <string name="sleep_attribution_title">睡眠归属日</string>
     <string name="sleep_attribution_night_begins">以入睡当晚为准</string>
     <string name="sleep_attribution_morning_ends">以醒来早晨为准</string>
-    <string name="sleep_attribution_night_begins_description">每段睡眠会记录在开始当晚的日记中。这是默认设置，与之前的导出一致。</string>
+    <string name="sleep_attribution_night_begins_description">每段睡眠会记录在开始当晚的日记中。</string>
     <string name="sleep_attribution_morning_ends_description">每段睡眠会记录在结束当天早晨（醒来日）的日记中，与 Health Connect 应用的显示方式一致。晚上 11:45 到早上 7:30 的睡眠会出现在醒来当天的日记中。</string>
 
     <string name="metric_selection_title">健康指标</string>

@@ -18,9 +18,10 @@ noon belongs to the new day.
 The shared **Sleep Day Attribution** setting (`settings.sleep-attribution`) selects which journal
 day owns a sleep session:
 
-- **Night begins** (`night_begins`, default, rule `noon-to-noon-sleep-window-v1`): the shipped
-  behavior described throughout this document. Existing exports never change silently.
-- **Morning ends** (`morning_ends`, rule `wake-date-sleep-window-v1`): the journal date owns every
+- **Night begins** (`night_begins`, upstream and Apple default, rule
+  `noon-to-noon-sleep-window-v1`): the shipped behavior described throughout this document.
+- **Morning ends** (`morning_ends`, this fork's Android default, rule
+  `wake-date-sleep-window-v1`): the journal date owns every
   source session whose **end** falls on that date, matching the Health Connect UI. Owned sessions
   are kept whole — never clipped at a noon boundary and never split between two journal days —
   and afternoon naps stay on the day they end. Malformed zero/negative-length records land on
@@ -30,7 +31,7 @@ The setting is a device-local capture preference (DataStore key `sleep_day_attri
 with the operation timezone before the first Health Connect read for manual, scheduled, API,
 direct-file, report, and widget capture. Every read in that operation receives the same explicit
 value; the authoritative range result is not retried through provider-native single-day semantics.
-Apple persists the identical raw values and
+Apple persists the identical raw values and keeps the `night_begins`
 default (`healthKit.sleepDayAttribution`, UserDefaults). The setting is deliberately excluded from
 portable Share My Setup envelopes and durable retry snapshots on both platforms, and it changes
 only owner-date assignment — never values, units, reducers, stage identities, or the frozen v4 /

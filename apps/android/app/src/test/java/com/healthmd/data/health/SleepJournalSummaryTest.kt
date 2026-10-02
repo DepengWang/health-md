@@ -207,6 +207,7 @@ class SleepJournalSummaryTest {
             requestedDates = listOf(previousDay, journalDay),
             zone = utc,
             includeGranularData = true,
+            attribution = SleepDayAttribution.NIGHT_BEGINS,
         )
 
         assertThat(result.getValue(previousDay).sessions.map { it.identity?.nativeId })
@@ -368,13 +369,19 @@ class SleepJournalSummaryTest {
             ),
         )
 
-        val single = SleepJournalSummary.summarize(sessions, listOf(journalDay), utc, true)
-            .getValue(journalDay)
+        val single = SleepJournalSummary.summarize(
+            sessions,
+            listOf(journalDay),
+            utc,
+            true,
+            SleepDayAttribution.NIGHT_BEGINS,
+        ).getValue(journalDay)
         val range = SleepJournalSummary.summarize(
             sessions,
             listOf(journalDay, journalDay.plusDays(1)),
             utc,
             false,
+            SleepDayAttribution.NIGHT_BEGINS,
         ).getValue(journalDay)
 
         assertThat(single.copy(stages = emptyList())).isEqualTo(range)
@@ -554,7 +561,7 @@ class SleepJournalSummaryTest {
         date: LocalDate,
         sessions: List<SourceSession>,
         zone: ZoneId = utc,
-        attribution: SleepDayAttribution = SleepDayAttribution.DEFAULT,
+        attribution: SleepDayAttribution = SleepDayAttribution.NIGHT_BEGINS,
     ) = SleepJournalSummary.summarize(
         sourceSessions = sessions,
         requestedDates = listOf(date),
