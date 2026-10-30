@@ -2011,6 +2011,7 @@ class HealthConnectManager(
                     distanceRecords
                         .filter { it.overlaps(session.startTime, session.endTime) }
                         .singleOrigin(session.metadata.dataOrigin.packageName, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
+                        .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
                 }.distinct().sumOf { it.distance.inMeters }.positiveOrNull()
             }
             val swimmingSessions = exerciseSessions.records.filter { mapExerciseType(it.exerciseType) == WorkoutType.SWIMMING }
@@ -3025,12 +3026,15 @@ class HealthConnectManager(
         val distanceRecords = sources.distanceRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
             .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
+            .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
         val calorieRecords = sources.calorieRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
             .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.energy.inKilocalories })
+            .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
         val elevationRecords = sources.elevationRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
             .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.elevation.inMeters })
+            .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
         val distance = distanceRecords.sumOf { it.distance.inMeters }.positiveOrNull()
         val calories = calorieRecords.sumOf { it.energy.inKilocalories }.positiveOrNull()
         // A route granted through the interactive per-session consent flow is equivalent to
@@ -3558,3 +3562,23 @@ internal fun <T> List<T>.singleOrigin(
     byOrigin[preferredOrigin]?.let { return it }
     return byOrigin.maxByOrNull { (_, records) -> records.sumOf(amountOf) }!!.value
 }
+
+/**
+ * A source may write both a whole-workout total and per-minute samples for the same span, which
+ * double-counts when summed. If one record matches the workout's own bounds (within a minute), treat
+ * it as the workout total and use it alone; otherwise keep every record.
+ */
+internal fun <T> List<T>.sessionTotalOrAll(
+    sessionStart: Instant,
+    sessionEnd: Instant,
+    startOf: (T) -> Instant,
+    endOf: (T) -> Instant,
+    tolerance: java.time.Duration = java.time.Duration.ofMinutes(1),
+): List<T> {
+    val total = filter {
+        java.time.Duration.between(startOf(it), sessionStart).abs() <= tolerance &&
+            java.time.Duration.between(endOf(it), sessionEnd).abs() <= tolerance
+    }.minByOrNull { startOf(it) }
+    return if (total != null && size > 1) listOf(total) else this
+}
+
