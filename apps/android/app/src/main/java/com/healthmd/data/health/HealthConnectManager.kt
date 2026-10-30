@@ -2007,9 +2007,11 @@ class HealthConnectManager(
             fun distanceFor(vararg types: WorkoutType): Double? {
                 val matchingSessions = exerciseSessions.records.filter { mapExerciseType(it.exerciseType) in types }
                 if (matchingSessions.isEmpty()) return null
-                return distanceRecords.filter { distance ->
-                    matchingSessions.any { session -> distance.overlaps(session.startTime, session.endTime) }
-                }.sumOf { it.distance.inMeters }.positiveOrNull()
+                return matchingSessions.flatMap { session ->
+                    distanceRecords
+                        .filter { it.overlaps(session.startTime, session.endTime) }
+                        .singleOrigin(session.metadata.dataOrigin.packageName, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
+                }.distinct().sumOf { it.distance.inMeters }.positiveOrNull()
             }
             val swimmingSessions = exerciseSessions.records.filter { mapExerciseType(it.exerciseType) == WorkoutType.SWIMMING }
             val swimmingStrokes = swimmingSessions
@@ -3019,14 +3021,18 @@ class HealthConnectManager(
                 )
             }.sortedBy { it.time }
 
-        val distance = sources.distanceRecords
+        val sessionOrigin = session.metadata.dataOrigin.packageName
+        val distanceRecords = sources.distanceRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
-            .sumOf { it.distance.inMeters }
-            .positiveOrNull()
-        val calories = sources.calorieRecords
+            .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
+        val calorieRecords = sources.calorieRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
-            .sumOf { it.energy.inKilocalories }
-            .positiveOrNull()
+            .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.energy.inKilocalories })
+        val elevationRecords = sources.elevationRecords
+            .filter { it.overlaps(session.startTime, session.endTime) }
+            .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.elevation.inMeters })
+        val distance = distanceRecords.sumOf { it.distance.inMeters }.positiveOrNull()
+        val calories = calorieRecords.sumOf { it.energy.inKilocalories }.positiveOrNull()
         // A route granted through the interactive per-session consent flow is equivalent to
         // Health Connect returning it inline; sessions without a grant keep their exact
         // inline result, including consent_required.
@@ -3059,10 +3065,7 @@ class HealthConnectManager(
             ?.sortedBy { it.time }
             ?: emptyList()
         val (routeElevationGain, routeElevationLoss) = routePoints.elevationGainLoss()
-        val elevation = sources.elevationRecords
-            .filter { it.overlaps(session.startTime, session.endTime) }
-            .sumOf { it.elevation.inMeters }
-            .positiveOrNull() ?: routeElevationGain
+        val elevation = elevationRecords.sumOf { it.elevation.inMeters }.positiveOrNull() ?: routeElevationGain
         val averageSpeed = speedSamples.map { it.value }.averageOrNull()
         val laps = session.laps.map { lap ->
             WorkoutLapData(
@@ -3140,14 +3143,14 @@ class HealthConnectManager(
                 fun putIds(key: String, ids: List<String>) {
                     if (ids.isNotEmpty()) put(key, ids.distinct().sorted())
                 }
-                putIds("distance", sources.distanceRecords.filter { it.overlaps(session.startTime, session.endTime) }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
-                putIds("calories", sources.calorieRecords.filter { it.overlaps(session.startTime, session.endTime) }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
+                putIds("distance", distanceRecords.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
+                putIds("calories", calorieRecords.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
                 putIds("heart_rate", sources.heartRateRecords.filter { record -> record.samples.any { it.time.isWithin(session.startTime, session.endTime) } }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
                 putIds("speed", sources.speedRecords.filter { record -> record.samples.any { it.time.isWithin(session.startTime, session.endTime) } }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
                 putIds("cycling_cadence", sources.cyclingCadenceRecords.filter { record -> record.samples.any { it.time.isWithin(session.startTime, session.endTime) } }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
                 putIds("steps_cadence", sources.stepsCadenceRecords.filter { record -> record.samples.any { it.time.isWithin(session.startTime, session.endTime) } }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
                 putIds("power", sources.powerRecords.filter { record -> record.samples.any { it.time.isWithin(session.startTime, session.endTime) } }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
-                putIds("elevation", sources.elevationRecords.filter { it.overlaps(session.startTime, session.endTime) }.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
+                putIds("elevation", elevationRecords.mapNotNull { it.metadata.id.takeIf(String::isNotBlank) })
             },
         )
     }
@@ -3538,4 +3541,20 @@ private fun Exception.isHistoricalOrBackgroundAccessFailure(): Boolean {
     return message.contains("history", ignoreCase = true) ||
         message.contains("historical", ignoreCase = true) ||
         message.contains("background", ignoreCase = true)
+}
+
+/**
+ * Keeps records from a single data origin so overlapping writers (e.g. a wearable sync app and the
+ * phone's own sensors recording the same workout) are not summed twice. Prefers the workout's own
+ * origin; otherwise the origin with the largest total.
+ */
+internal fun <T> List<T>.singleOrigin(
+    preferredOrigin: String,
+    originOf: (T) -> String,
+    amountOf: (T) -> Double,
+): List<T> {
+    val byOrigin = groupBy(originOf)
+    if (byOrigin.size <= 1) return this
+    byOrigin[preferredOrigin]?.let { return it }
+    return byOrigin.maxByOrNull { (_, records) -> records.sumOf(amountOf) }!!.value
 }
