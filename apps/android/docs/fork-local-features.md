@@ -98,20 +98,25 @@ git merge-tree --write-tree --name-only main upstream/main
 
 On 2026-10-31 (1069 upstream commits ahead) this reported only two conflicting files:
 `apps/apple/HealthMd/Shared/Managers/HealthKitManager.swift` and `packages/contracts/manifest.json`.
-Android merged cleanly in text, but compilation and tests were not checked. Resolve on a trial branch,
+Android merged cleanly in text, but compilation and tests were not checked. The trailing block this fork
+adds to `.gitattributes` (CRLF fix below) can conflict trivially, because upstream also appends `eol=lf` rules there; keep both. Resolve on a trial branch,
 then build and run the tests before touching `main`. `manifest.json` carries digests; regenerate it
 rather than editing by hand.
 
 ## Running the unit tests on Windows
 
-Known failures that are environmental, not product bugs (16 at the last full run; the manifest test was
-fixed afterwards and verified on its own, so 15 are expected, but the full suite was not re-run):
+Known failures that are environmental, not product bugs (15 at the last full run on 2026-10-31; the
+CRLF fixture test below was fixed afterwards and verified on its own, so 14 are expected):
 
 - `RawChangesServiceTest` (12): the code fsyncs a directory, which Windows refuses.
 - `SharedSetupIntentCoordinatorTest`, `ClinicianReportFileStoreTest`: Robolectric `FileProvider` cannot
   match a `C:\...` temp root.
-- `SharedSetupShareFixtureDocumentTest`: `core.autocrlf=true` checks the embedding Kotlin file out as
-  CRLF while the fixture is pinned to LF.
+
+Fixed locally: `SharedSetupShareFixtureDocumentTest` failed because `core.autocrlf=true` checked out
+`SharedSetupAndroidRuntimeTest.kt` (which embeds the LF-pinned contract fixture byte-for-byte) as CRLF.
+`.gitattributes` now pins that one file to `eol=lf` (a separate block at the end of the file, to keep
+upstream syncs easy). After pulling this on another Windows checkout, delete and re-checkout that file
+once so the new rule applies.
 
 The local HTTPS tests (`APIExportClientTest`, `RawSnapshotApiClientTest`,
 `RawSnapshotProductApiServiceTest`) fail on Windows because Java resolves `127.0.0.1` to the literal IP

@@ -12,3 +12,6 @@ apps/apple/HealthMdTests/Fixtures/Export/export_schema_signature_v*.json text eo
 apps/android/healthmd-core/src/main/kotlin/com/healthmd/core/healthmd_core_uniffi.kt -whitespace
 apps/apple/Packages/HealthMdCoreRust/Bindings/HealthmdCoreFFI.h -whitespace
 apps/apple/Packages/HealthMdCoreRust/Sources/HealthMdCoreRust/Generated/HealthmdCore.swift -whitespace
+
+# Embeds a contract fixture byte-for-byte (including its final LF), so it must not be CRLF on Windows.
+apps/android/app/src/androidTest/java/com/healthmd/sharedsetup/SharedSetupAndroidRuntimeTest.kt text eol=lf
