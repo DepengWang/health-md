@@ -105,12 +105,16 @@ rather than editing by hand.
 
 ## Running the unit tests on Windows
 
-Known failures that are environmental, not product bugs (15 at the last full run on 2026-10-31; the
-CRLF fixture test below was fixed afterwards and verified on its own, so 14 are expected):
+Known failures that are environmental, not product bugs (2 at the last full run on 2026-10-31, 1203 tests):
 
-- `RawChangesServiceTest` (12): the code fsyncs a directory, which Windows refuses.
 - `SharedSetupIntentCoordinatorTest`, `ClinicianReportFileStoreTest`: Robolectric `FileProvider` cannot
   match a `C:\...` temp root.
+
+Fixed locally: `RawChangesServiceTest` (12 tests) failed on Windows because the test's default
+`directorySync` helper opened a directory for fsync, which Windows refuses (NTFS journals directory
+metadata). The helper now skips that step on Windows only; other hosts keep the real fsync, tests that
+inject their own `directorySync` are unchanged, and production code (Android uses `Os.fsync`) was not
+touched.
 
 Fixed locally: `SharedSetupShareFixtureDocumentTest` failed because `core.autocrlf=true` checked out
 `SharedSetupAndroidRuntimeTest.kt` (which embeds the LF-pinned contract fixture byte-for-byte) as CRLF.

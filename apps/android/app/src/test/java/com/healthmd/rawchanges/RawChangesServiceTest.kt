@@ -562,7 +562,11 @@ class RawChangesServiceTest {
         source: FakeSource,
         hook: RawChangesDurabilityHook = RawChangesDurabilityHook { },
         directorySync: (File) -> Unit = { directory ->
-            java.nio.channels.FileChannel.open(directory.toPath(), java.nio.file.StandardOpenOption.READ).use { it.force(true) }
+            // Windows refuses to open a directory for fsync (NTFS journals directory metadata), so a
+            // host-JVM test run there has nothing to force; every other host keeps the real fsync.
+            if (!System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+                java.nio.channels.FileChannel.open(directory.toPath(), java.nio.file.StandardOpenOption.READ).use { it.force(true) }
+            }
         },
     ): Harness {
         val root = temporary.newFolder("harness-${System.nanoTime()}")
