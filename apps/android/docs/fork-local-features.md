@@ -115,23 +115,28 @@ fixed afterwards and verified on its own, so 15 are expected, but the full suite
 
 The local HTTPS tests (`APIExportClientTest`, `RawSnapshotApiClientTest`,
 `RawSnapshotProductApiServiceTest`) fail on Windows because Java resolves `127.0.0.1` to the literal IP
-while the test certificate is issued for `localhost`. Passing a hosts file to the test JVM fixes it
-without touching the system or the repository:
+while the test certificate is issued for `localhost`. Editing the system `hosts` file does **not** fix
+this. Passing a hosts file to the test JVM does, without touching the system or the repository.
+
+On the maintainer's machine this is a permanent, user-level Gradle setup (outside the repository):
+
+- `~/.gradle/health-md-test-hosts` containing `127.0.0.1 localhost` and `::1 localhost`
+- `~/.gradle/init.d/health-md-test-hosts.gradle`, loaded automatically, nothing to pass on the command line:
 
 ```
-# test-hosts
-127.0.0.1 localhost
-::1 localhost
-```
-
-```
-// test-hosts.init.gradle, used as: gradlew -I test-hosts.init.gradle ...
 allprojects {
-    tasks.withType(Test).configureEach {
-        systemProperty "jdk.net.hosts.file", "<absolute path to test-hosts>"
+    if (rootProject.projectDir.toURI().toString().contains('/health-md/')) {
+        tasks.withType(Test).configureEach {
+            systemProperty "jdk.net.hosts.file", "<absolute path to health-md-test-hosts>"
+        }
     }
 }
 ```
+
+The path check limits it to checkouts under `/health-md/`, so other Gradle projects are unaffected. To try
+it once without the permanent setup, put the same `allprojects` block (without the `if`) in a file and
+pass it with `gradlew -I <file> ...`. Caveat: `jdk.net.hosts.file` replaces name resolution in the test
+JVM, so a future test that needs real DNS would fail to resolve.
 
 Build notes (JDK 17, Rust library built outside Gradle, `-x :healthmd-core:prepareRustDebug`) are in
 the maintainer's local notes, not in this repository.
