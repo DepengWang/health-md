@@ -188,6 +188,12 @@ class SharedSetupIntentCoordinatorTest {
         }
         assertThat(directory.exists()).isFalse()
 
+        // androidx FileProvider matches roots with a hard-coded '/' separator (belongsToRoot), so it can never
+        // resolve a Windows path; everything above this line still runs on Windows.
+        org.junit.Assume.assumeFalse(
+            "androidx FileProvider cannot resolve Windows paths",
+            System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
+        )
         val first = store.shareIntent(validBytes)
         val firstUri = requireNotNull(IntentCompat.getParcelableExtra(first.intent, Intent.EXTRA_STREAM, Uri::class.java))
         val firstDirectory = requireNotNull(directory.listFiles()?.singleOrNull())

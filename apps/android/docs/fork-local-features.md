@@ -105,10 +105,19 @@ rather than editing by hand.
 
 ## Running the unit tests on Windows
 
-Known failures that are environmental, not product bugs (2 at the last full run on 2026-10-31, 1203 tests):
+The full suite is green on Windows as of 2026-10-31 (1203 tests, 0 failures, 3 skipped), after the local fixes below.
 
-- `SharedSetupIntentCoordinatorTest`, `ClinicianReportFileStoreTest`: Robolectric `FileProvider` cannot
-  match a `C:\...` temp root.
+Skipped on Windows by design:
+
+- `ClinicianReportFileStoreTest.filenameExcludesDisplayNameCleansStaleFileAndSharesContentUri` and
+  `SharedSetupIntentCoordinatorTest.share artifacts use unique uris survive recipient handoff and are pruned`
+  end in `Assume.assumeFalse(...)` for Windows. androidx `FileProvider` (core 1.19.1) matches a root with
+  `path.startsWith(root + '/')` (`SimplePathStrategy.belongsToRoot`), so it cannot resolve any Windows
+  path, whatever the temp directory is. Moving or renaming the temp directory does not help. The
+  assertions before the first `FileProvider` call still run on Windows; the `FileProvider` part is expected to run
+  on Linux/CI, but that was not verified here.
+- `ClinicianReportDense90DayBenchmarkTest` is opt-in upstream (it only runs when the environment variable
+  `HEALTHMD_CLINICIAN_REPORT_DENSE_PDF_BENCHMARK=1` is set).
 
 Fixed locally: `RawChangesServiceTest` (12 tests) failed on Windows because the test's default
 `directorySync` helper opened a directory for fsync, which Windows refuses (NTFS journals directory

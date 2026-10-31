@@ -96,6 +96,12 @@ class ClinicianReportFileStoreTest {
         assertThat(file.name).isEqualTo("Health-Summary_2026-01-01_2026-01-30.pdf")
         assertThat(file.name).doesNotContain("Sensitive")
         assertThat(file.name).doesNotContain("_to_")
+        // androidx FileProvider matches roots with a hard-coded '/' separator (belongsToRoot), so it can never
+        // resolve a Windows path; everything above this line still runs on Windows.
+        org.junit.Assume.assumeFalse(
+            "androidx FileProvider cannot resolve Windows paths",
+            System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
+        )
         val intent = store.shareIntent(file)
         assertThat(intent.type).isEqualTo("application/pdf")
         assertThat(store.contentUri(file).scheme).isEqualTo("content")
