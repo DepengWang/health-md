@@ -8,6 +8,7 @@ import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.aggregate.AggregationResult
 import androidx.health.connect.client.feature.ExperimentalPersonalHealthRecordApi
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
@@ -46,8 +47,30 @@ class HealthConnectManager(
     private val context: Context,
     sharedClient: HealthConnectClient? = null,
     private val routeConsentGateway: ExerciseRouteConsentGateway = NoExerciseRouteConsentGateway,
+    private val activityOriginPreference: ActivityOriginPreference = ActivityOriginPreference.NONE,
 ) {
     private val healthConnectClient by lazy { sharedClient ?: HealthConnectClient.getOrCreate(context) }
+
+    /** Fork-local: restricts activity aggregates/reads to the user's preferred data origin, if any. */
+    private suspend fun activityOriginFilter(): Set<DataOrigin> =
+        activityOriginPreference.preferredOrigin()?.let { setOf(DataOrigin(it)) } ?: emptySet()
+
+    /**
+     * Fork-local: origins that contributed steps or distance in the last [days] days, for the
+     * settings picker. Aggregates report their contributing origins without reading every record.
+     */
+    suspend fun recentActivityOrigins(days: Long = 14): List<String> = try {
+        val end = java.time.Instant.now()
+        healthConnectClient.aggregate(
+            AggregateRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL, DistanceRecord.DISTANCE_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(end.minus(java.time.Duration.ofDays(days)), end),
+            )
+        ).dataOrigins.map { it.packageName }.sorted()
+    } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        emptyList()
+    }
 
     /** Recomputed so a Health Connect provider update can enable additional capabilities. */
     fun permissionPlan(): HealthConnectPermissionPlan =
@@ -483,6 +506,7 @@ class HealthConnectManager(
                 setOf(StepsRecord.COUNT_TOTAL),
                 requestedDates,
                 zone,
+                activityOriginFilter(),
             )) {
                 dataByDate.update(date) { current ->
                     current.copy(
@@ -498,6 +522,7 @@ class HealthConnectManager(
                 setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                 requestedDates,
                 zone,
+                activityOriginFilter(),
             )) {
                 dataByDate.update(date) { current ->
                     current.copy(
@@ -634,6 +659,7 @@ class HealthConnectManager(
                         date.atStartOfDay(zone).toInstant(),
                         date.plusDays(1).atStartOfDay(zone).toInstant(),
                     ),
+                    dataOriginFilter = activityOriginFilter(),
                 )
             )
             val steps = result[StepsRecord.COUNT_TOTAL]?.toInt() ?: continue
@@ -1029,6 +1055,7 @@ class HealthConnectManager(
         if (sessionsByDate.isEmpty()) return
 
         val sources = WorkoutSourceRecords(
+            preferredOrigin = activityOriginPreference.preferredOrigin(),
             distanceRecords = readRecordsOrEmpty(DistanceRecord::class, timeRange),
             calorieRecords = readRecordsOrEmpty(ActiveCaloriesBurnedRecord::class, timeRange),
             heartRateRecords = if (selection.workouts || selection.heart) readRecordsOrEmpty(HeartRateRecord::class, timeRange) else emptyList(),
@@ -1781,6 +1808,7 @@ class HealthConnectManager(
         metrics: Set<AggregateMetric<*>>,
         requestedDates: Set<LocalDate>,
         zone: ZoneId,
+        origins: Set<DataOrigin> = emptySet(),
     ): List<Pair<LocalDate, AggregateValues>> {
         if (metrics.isEmpty()) return emptyList()
         // Period aggregation accepts LocalDateTime boundaries only and therefore cannot honor an
@@ -1794,6 +1822,7 @@ class HealthConnectManager(
                         date.atStartOfDay(zone).toInstant(),
                         date.plusDays(1).atStartOfDay(zone).toInstant(),
                     ),
+                    dataOriginFilter = origins,
                 )
             )
             val values = metrics.mapNotNull { metric ->
@@ -1990,6 +2019,7 @@ class HealthConnectManager(
                         }
                     },
                     timeRangeFilter = timeRange,
+                    dataOriginFilter = activityOriginFilter(),
                 )
             )
 
@@ -2002,15 +2032,16 @@ class HealthConnectManager(
             }
 
             val distanceRecords = healthConnectClient.readRecords(
-                ReadRecordsRequest(DistanceRecord::class, timeRange)
+                ReadRecordsRequest(DistanceRecord::class, timeRange, activityOriginFilter())
             ).records
+            val preferredActivityOrigin = activityOriginPreference.preferredOrigin()
             fun distanceFor(vararg types: WorkoutType): Double? {
                 val matchingSessions = exerciseSessions.records.filter { mapExerciseType(it.exerciseType) in types }
                 if (matchingSessions.isEmpty()) return null
                 return matchingSessions.flatMap { session ->
                     distanceRecords
                         .filter { it.overlaps(session.startTime, session.endTime) }
-                        .singleOrigin(session.metadata.dataOrigin.packageName, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
+                        .singleOrigin(listOfNotNull(preferredActivityOrigin, session.metadata.dataOrigin.packageName), { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
                         .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
                 }.distinct().sumOf { it.distance.inMeters }.positiveOrNull()
             }
@@ -2032,7 +2063,7 @@ class HealthConnectManager(
 
             // Per-interval step samples
             val stepsRecords = healthConnectClient.readRecords(
-                ReadRecordsRequest(StepsRecord::class, timeRange)
+                ReadRecordsRequest(StepsRecord::class, timeRange, activityOriginFilter())
             )
             val stepSamples = stepsRecords.records.map { record ->
                 TimestampedSample(
@@ -2885,6 +2916,7 @@ class HealthConnectManager(
             )
 
             val sources = WorkoutSourceRecords(
+                preferredOrigin = activityOriginPreference.preferredOrigin(),
                 distanceRecords = readRecordsOrEmpty(DistanceRecord::class, timeRange),
                 calorieRecords = readRecordsOrEmpty(ActiveCaloriesBurnedRecord::class, timeRange),
                 heartRateRecords = readRecordsOrEmpty(HeartRateRecord::class, timeRange),
@@ -3022,18 +3054,18 @@ class HealthConnectManager(
                 )
             }.sortedBy { it.time }
 
-        val sessionOrigin = session.metadata.dataOrigin.packageName
+        val originOrder = listOfNotNull(sources.preferredOrigin, session.metadata.dataOrigin.packageName)
         val distanceRecords = sources.distanceRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
-            .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
+            .singleOrigin(originOrder, { it.metadata.dataOrigin.packageName }, { it.distance.inMeters })
             .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
         val calorieRecords = sources.calorieRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
-            .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.energy.inKilocalories })
+            .singleOrigin(originOrder, { it.metadata.dataOrigin.packageName }, { it.energy.inKilocalories })
             .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
         val elevationRecords = sources.elevationRecords
             .filter { it.overlaps(session.startTime, session.endTime) }
-            .singleOrigin(sessionOrigin, { it.metadata.dataOrigin.packageName }, { it.elevation.inMeters })
+            .singleOrigin(originOrder, { it.metadata.dataOrigin.packageName }, { it.elevation.inMeters })
             .sessionTotalOrAll(session.startTime, session.endTime, { it.startTime }, { it.endTime })
         val distance = distanceRecords.sumOf { it.distance.inMeters }.positiveOrNull()
         val calories = calorieRecords.sumOf { it.energy.inKilocalories }.positiveOrNull()
@@ -3510,6 +3542,8 @@ class HealthConnectManager(
         .averageOrNull()
 
     private data class WorkoutSourceRecords(
+        /** Fork-local user preference; tried before the workout's own origin. */
+        val preferredOrigin: String? = null,
         val distanceRecords: List<DistanceRecord> = emptyList(),
         val calorieRecords: List<ActiveCaloriesBurnedRecord> = emptyList(),
         val heartRateRecords: List<HeartRateRecord> = emptyList(),

@@ -38,6 +38,13 @@ interface SettingsRepository {
     suspend fun getSleepDayAttribution(): SleepDayAttribution = SleepDayAttribution.DEFAULT
     suspend fun setSleepDayAttribution(mode: SleepDayAttribution) = Unit
 
+    // Fork-local, device-local (not part of portable setup sharing): Health Connect data origin
+    // (app package) whose activity data is used exclusively. null = Health Connect's own priority.
+    val preferredActivityOrigin: Flow<String?>
+        get() = flowOf(null)
+    suspend fun getPreferredActivityOrigin(): String? = null
+    suspend fun setPreferredActivityOrigin(packageName: String?) = Unit
+
     // Export folder URI (persisted separately for SAF)
     val exportFolderUri: Flow<String?>
     suspend fun saveExportFolderUri(uri: String)

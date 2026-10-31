@@ -1,6 +1,7 @@
 package com.healthmd.di
 
 import android.content.Context
+import com.healthmd.data.health.ActivityOriginPreference
 import com.healthmd.data.health.HealthConnectDataProvider
 import com.healthmd.data.health.HealthConnectManager
 import com.healthmd.data.health.HealthProviderRegistry
@@ -32,7 +33,12 @@ object HealthModule {
     fun provideHealthConnectManager(
         @ApplicationContext context: Context,
         routeConsentCoordinator: ExerciseRouteConsentCoordinator,
-    ): HealthConnectManager = HealthConnectManager(context, routeConsentGateway = routeConsentCoordinator)
+        settingsRepository: SettingsRepository,
+    ): HealthConnectManager = HealthConnectManager(
+        context,
+        routeConsentGateway = routeConsentCoordinator,
+        activityOriginPreference = ActivityOriginPreference { settingsRepository.getPreferredActivityOrigin() },
+    )
 
     @Provides
     @Singleton

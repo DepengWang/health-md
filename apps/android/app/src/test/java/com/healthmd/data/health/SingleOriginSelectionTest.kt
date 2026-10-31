@@ -41,4 +41,25 @@ class SingleOriginSelectionTest {
     fun `empty list stays empty`() {
         assertEquals(emptyList<Rec>(), emptyList<Rec>().select("sync"))
     }
+
+    @Test
+    fun `user preferred origin wins over the workout origin`() {
+        val records = listOf(Rec("sync", 100.0), Rec("phone", 900.0), Rec("fit", 50.0))
+        val picked = records.singleOrigin(listOf("fit", "sync"), { it.origin }, { it.amount })
+        assertEquals(listOf(Rec("fit", 50.0)), picked)
+    }
+
+    @Test
+    fun `falls through the preference list in order`() {
+        val records = listOf(Rec("sync", 100.0), Rec("phone", 900.0))
+        val picked = records.singleOrigin(listOf("fit", "sync"), { it.origin }, { it.amount })
+        assertEquals(listOf(Rec("sync", 100.0)), picked)
+    }
+
+    @Test
+    fun `falls back to the largest origin when no preference matches`() {
+        val records = listOf(Rec("sync", 100.0), Rec("phone", 900.0))
+        val picked = records.singleOrigin(listOf("fit"), { it.origin }, { it.amount })
+        assertEquals(listOf(Rec("phone", 900.0)), picked)
+    }
 }

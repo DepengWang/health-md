@@ -40,6 +40,7 @@ class SettingsRepositoryImpl(
 
         val PREVENT_ACCIDENTAL_CHANGES = booleanPreferencesKey("prevent_accidental_changes")
         val SLEEP_DAY_ATTRIBUTION = stringPreferencesKey("sleep_day_attribution")
+        val PREFERRED_ACTIVITY_ORIGIN = stringPreferencesKey("preferred_activity_origin")
         val EXPORT_FOLDER_URI = stringPreferencesKey("export_folder_uri")
         val FREE_EXPORTS_USED = intPreferencesKey("free_exports_used")
         val LEGACY_FREE_EXPORTS_REMAINING = intPreferencesKey("free_exports_remaining")
@@ -111,6 +112,19 @@ class SettingsRepositoryImpl(
     override suspend fun setSleepDayAttribution(mode: SleepDayAttribution) {
         dataStore.edit { prefs ->
             prefs[Keys.SLEEP_DAY_ATTRIBUTION] = mode.wireValue
+        }
+    }
+
+    override val preferredActivityOrigin: Flow<String?> = dataStore.data.map { prefs ->
+        prefs[Keys.PREFERRED_ACTIVITY_ORIGIN]?.takeIf { it.isNotBlank() }
+    }
+
+    override suspend fun getPreferredActivityOrigin(): String? = preferredActivityOrigin.first()
+
+    override suspend fun setPreferredActivityOrigin(packageName: String?) {
+        dataStore.edit { prefs ->
+            if (packageName.isNullOrBlank()) prefs.remove(Keys.PREFERRED_ACTIVITY_ORIGIN)
+            else prefs[Keys.PREFERRED_ACTIVITY_ORIGIN] = packageName
         }
     }
     override val exportFolderUri: Flow<String?> = dataStore.data.map { prefs ->

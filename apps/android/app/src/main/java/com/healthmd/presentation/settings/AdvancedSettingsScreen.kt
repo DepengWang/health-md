@@ -169,6 +169,9 @@ fun AdvancedSettingsScreen(
             )
         }
 
+        // Fork-local: single data origin for activity data (see ActivityOriginSettingCard).
+        ActivityOriginSettingCard()
+
         // Granular Data
         GeistCard {
             Row(

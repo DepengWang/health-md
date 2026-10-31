@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="activity_origin_title">活动数据来源</string>
+    <string name="activity_origin_description">步数、距离、卡路里和锻炼详情只使用所选的一个来源，避免两个应用记录同一段运动时数据混在一起。睡眠、心率和身体数据不受影响。</string>
+    <string name="activity_origin_auto">自动（按 Health Connect 优先级）</string>
+    <string name="activity_origin_none_detected">最近 14 天没有任何来源的活动数据。</string>
+</resources>

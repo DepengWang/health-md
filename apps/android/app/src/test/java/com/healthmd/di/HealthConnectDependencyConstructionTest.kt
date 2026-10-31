@@ -14,7 +14,7 @@ class HealthConnectDependencyConstructionTest {
         val settingsRepository = mockk<SettingsRepository>(relaxed = true)
         val routeConsentCoordinator = ExerciseRouteConsentCoordinator()
 
-        assertThat(HealthModule.provideHealthConnectManager(context, routeConsentCoordinator)).isNotNull()
+        assertThat(HealthModule.provideHealthConnectManager(context, routeConsentCoordinator, settingsRepository)).isNotNull()
         assertThat(
             HealthModule.provideHealthConnectRawDataProvider(context, settingsRepository, routeConsentCoordinator)
         ).isNotNull()

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fork-local strings (not in upstream). Kept out of strings.xml so syncing upstream never conflicts
+  with them and so the 15-locale parity contract (LocalizationContractTest) is unaffected.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="activity_origin_title">Activity data source</string>
+    <string name="activity_origin_description">Use steps, distance, calories and workout details from one source only, so two apps recording the same movement are never mixed. Sleep, heart and body data are not affected.</string>
+    <string name="activity_origin_auto">Automatic (Health Connect priority)</string>
+    <string name="activity_origin_none_detected">No activity data from any source in the last 14 days.</string>
+</resources>
